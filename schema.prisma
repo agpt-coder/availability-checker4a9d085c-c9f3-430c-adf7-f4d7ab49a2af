@@ -1,0 +1,119 @@
+// datasource db defines the database connection settings.
+// It is configured for PostgreSQL and uses an environment variable for the connection URL.
+// The 'extensions' feature enables the use of PostgreSQL-specific data types.
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+}
+
+// generator db configures Prisma Client settings.
+// It is set up to use Prisma Client Python with asyncio interface and specific features.
+generator db {
+  provider                    = "prisma-client-py"
+  interface                   = "asyncio"
+  recursive_type_depth        = 5
+  previewFeatures             = ["postgresqlExtensions"]
+  enable_experimental_decimal = true
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  password      String
+  role          Role
+  profile       Profile?
+  appointments  Appointment[]
+  feedbackGiven Feedback[]
+  notifications Notification[]
+}
+
+model Profile {
+  id               Int               @id @default(autoincrement())
+  userId           Int               @unique
+  user             User              @relation(fields: [userId], references: [id])
+  firstName        String
+  lastName         String
+  bio              String?
+  professionalInfo ProfessionalInfo?
+  appointments     Appointment[]     @relation("ProfessionalAppointments")
+  feedbackReceived Feedback[]        @relation("ProfessionalFeedback")
+  Calendar         Calendar[]
+}
+
+model ProfessionalInfo {
+  id             Int             @id @default(autoincrement())
+  profileId      Int             @unique
+  profile        Profile         @relation(fields: [profileId], references: [id])
+  availability   Json // Storing weekly availability as JSON
+  realTimeStatus RealTimeStatus?
+}
+
+model RealTimeStatus {
+  id                 Int              @id @default(autoincrement())
+  professionalInfoId Int              @unique
+  professionalInfo   ProfessionalInfo @relation(fields: [professionalInfoId], references: [id])
+  isAvailable        Boolean          @default(true)
+  currentActivity    String?
+}
+
+model Calendar {
+  id        Int             @id @default(autoincrement())
+  profileId Int
+  profile   Profile         @relation(fields: [profileId], references: [id])
+  events    CalendarEvent[]
+}
+
+model CalendarEvent {
+  id          Int      @id @default(autoincrement())
+  calendarId  Int
+  calendar    Calendar @relation(fields: [calendarId], references: [id])
+  start       DateTime
+  end         DateTime
+  title       String
+  description String?
+}
+
+model Appointment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  profileId Int
+  user      User     @relation(fields: [userId], references: [id])
+  profile   Profile  @relation(fields: [profileId], references: [id], name: "ProfessionalAppointments")
+  time      DateTime
+  status    Status   @default(Pending)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  profileId Int
+  user      User     @relation(fields: [userId], references: [id])
+  profile   Profile  @relation(fields: [profileId], references: [id], name: "ProfessionalFeedback")
+  content   String
+  rating    Int
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  Admin
+  Professional
+  User
+}
+
+enum Status {
+  Pending
+  Confirmed
+  Completed
+  Cancelled
+}
